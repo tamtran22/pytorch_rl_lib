@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
+import torch.distributions as dist
 
 
 #---------------------------------------------------------------------------
@@ -44,13 +45,18 @@ class ActionValueNetwork(BaseNetwork):
         self.action_shape = action_shape
 
         # Input layer take flatened transform of input tensor
-        self.input = nn.Linear(prod(self.state_shape) + prod(self.action_shape), hidden_size)
+        self.input = nn.Sequential(
+            nn.Linear(prod(self.state_shape) + prod(self.action_shape), hidden_size),
+            nn.Tanh()
+        )
         hidden_list = []
         for _ in range(n_hiddens - 1):
             hidden_list.append(nn.Linear(hidden_size, hidden_size))
-            hidden_list.append(nn.ReLU(inplace=True))
+            hidden_list.append(nn.Tanh())
         self.hidden = nn.Sequential(*hidden_list)
-        self.output = nn.Linear(hidden_size, 1)
+        self.output = nn.Sequential(
+            nn.Linear(hidden_size, 1)
+        )
 
         self.optimizer = optim.Adam(
             self.parameters(), 
@@ -64,10 +70,8 @@ class ActionValueNetwork(BaseNetwork):
             torch.flatten(action, start_dim=1)
         ], dim=1).to(self.device)
         x = self.input(x)
-        x = F.relu(x)
         x = self.hidden(x)
         x = self.output(x)
-        x = torch.sigmoid(x)
         return x
 
 
@@ -80,13 +84,18 @@ class StateValueNetwork(BaseNetwork):
         self.state_shape = state_shape
 
         # Input layer take flatened transform of input tensor
-        self.input = nn.Linear(prod(self.state_shape), hidden_size)
+        self.input = nn.Sequential(
+            nn.Linear(prod(self.state_shape), hidden_size),
+            nn.Tanh()
+        )
         hidden_list = []
         for _ in range(n_hiddens - 1):
             hidden_list.append(nn.Linear(hidden_size, hidden_size))
-            hidden_list.append(nn.ReLU(inplace=True))
+            hidden_list.append(nn.Tanh())
         self.hidden = nn.Sequential(*hidden_list)
-        self.output = nn.Linear(hidden_size, 1)
+        self.output = nn.Sequential(
+            nn.Linear(hidden_size, 1)
+        )
 
         self.optimizer = optim.Adam(
             self.parameters(), 
@@ -97,10 +106,8 @@ class StateValueNetwork(BaseNetwork):
     def forward(self, state):
         x = torch.flatten(state, start_dim=1).to(self.device)
         x = self.input(x)
-        x = F.relu(x)
         x = self.hidden(x)
         x = self.output(x)
-        x = torch.sigmoid(x)
         return x
 
 
@@ -114,11 +121,14 @@ class GaussianPolicyNetwork(BaseNetwork):
         self.action_shape = action_shape
 
         # Flaten input tensor
-        self.input = nn.Linear(prod(self.state_shape), hidden_size)
+        self.input = nn.Sequential(
+            nn.Linear(prod(self.state_shape), hidden_size),
+            nn.Tanh()
+        )
         hidden_list = []
         for _ in range(n_hiddens - 1):
             hidden_list.append(nn.Linear(hidden_size, hidden_size))
-            hidden_list.append(nn.ReLU(inplace=True))
+            hidden_list.append(nn.Tanh())
         self.hidden = nn.Sequential(*hidden_list)
         self.sigma = nn.Linear(hidden_size, prod(self.action_shape))
         self.mu = nn.Linear(hidden_size, prod(self.action_shape))
@@ -131,7 +141,6 @@ class GaussianPolicyNetwork(BaseNetwork):
     def forward(self, state):
         x = torch.flatten(state, start_dim=1).to(self.device)
         x = self.input(x)
-        x = F.relu(x)
         x = self.hidden(x)
         sigma = self.sigma(x)
         mu = self.mu(x)
@@ -148,7 +157,8 @@ class TDActorNetwork(GaussianPolicyNetwork):
             device, n_hiddens=n_hiddens, hidden_size=hidden_size, 
             name=name, chkpt=chkpt)
     def act(self, state):
-        pass
+        mu, sigma = self.forward(state)
+        norm = dist.Normal(mu, sigma)
     def evaluate(self, state, action):
         pass
 
