@@ -32,7 +32,6 @@ class RolloutBuffer(BaseMemory):
         self.variable = {}
         self.current_id = 0
         self.__count = 0
-        print('aaa')
         for var in variable_dict:
             self.variable[var] = np.zeros((self.buffer_size,) + \
                 variable_dict[var], dtype=np.float)
