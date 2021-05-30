@@ -1,10 +1,12 @@
 from abc import ABC
+from math import dist
 import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
-import torch.distributions as dist
+import torch.distributions as distributions
+
 
 
 #---------------------------------------------------------------------------
@@ -23,6 +25,7 @@ class BaseNetwork(nn.Module, ABC):
 
 
 
+
 #----------------------------------------------------------------------------
 # Policies
 #----------------------------------------------------------------------------
@@ -31,8 +34,6 @@ def prod(_tuple):
     for element in list(_tuple):
         product *= element
     return int(product)
-
-
 
 
 
@@ -115,10 +116,12 @@ class StateValueNetwork(BaseNetwork):
 
 class GaussianPolicyNetwork(BaseNetwork):
     def __init__(self, lr, state_shape, action_shape, device, n_hiddens=2,
-            hidden_size=256, name='actor_gauss', chkpt='./tmp') -> None:
+            hidden_size=256, reshape_action=False, name='actor_gauss',
+            chkpt='./tmp') -> None:
         super().__init__(device, name, chkpt)
         self.state_shape = state_shape
         self.action_shape = action_shape
+        self.reshape_action = reshape_action
 
         # Flaten input tensor
         self.input = nn.Sequential(
@@ -130,7 +133,10 @@ class GaussianPolicyNetwork(BaseNetwork):
             hidden_list.append(nn.Linear(hidden_size, hidden_size))
             hidden_list.append(nn.Tanh())
         self.hidden = nn.Sequential(*hidden_list)
-        self.sigma = nn.Linear(hidden_size, prod(self.action_shape))
+        self.sigma = nn.Sequential(
+            nn.Linear(hidden_size, prod(self.action_shape)),
+            nn.Sigmoid()
+        )
         self.mu = nn.Linear(hidden_size, prod(self.action_shape))
 
         self.optimizer = optim.Adam(
@@ -145,41 +151,72 @@ class GaussianPolicyNetwork(BaseNetwork):
         sigma = self.sigma(x)
         mu = self.mu(x)
         # reshape output as the same shape as action require.
-        mu = torch.reshape(mu, (state.shape[0],) + self.action_shape)
-        sigma = torch.reshape(sigma, (state.shape[0],) + self.action_shape)
+        if self.reshape_action:
+            mu = torch.reshape(mu, (state.shape[0],) + self.action_shape)
+            sigma = torch.reshape(sigma, (state.shape[0],) + self.action_shape)
         return mu, sigma
 
 
+
+
 class TDActorNetwork(GaussianPolicyNetwork):
-    def __init__(self, lr, state_shape, action_shape, device, 
-        n_hiddens=2, hidden_size=256, name='actor_gauss', chkpt='./temp') -> None:
-        super().__init__(lr, state_shape, action_shape, 
-            device, n_hiddens=n_hiddens, hidden_size=hidden_size, 
+    def __init__(self, lr, state_shape, action_shape, device, n_hiddens=2, 
+            hidden_size=256, name='actor_TD', chkpt='./temp') -> None:
+        super().__init__(lr, state_shape, action_shape, device, 
+            n_hiddens=n_hiddens, hidden_size=hidden_size, reshape_action=False,
             name=name, chkpt=chkpt)
     def act(self, state):
+        # Feeding 1 state at a time.
         mu, sigma = self.forward(state)
-        norm = dist.Normal(mu, sigma)
+        mu = mu.squeeze(0)
+        sigma = sigma.squeeze(0)
+        dist = distributions.Normal(mu, sigma)
+        pred_action = dist.sample()
+        logprob = dist.log_prob(pred_action)
+        # reshape output to action shape
+        pred_action = torch.reshape(pred_action, (state.shape[0],) + self.action_shape)
+        logprob = torch.reshape(logprob, (state.shape[0],) + self.action_shape)
+        return pred_action, logprob
     def evaluate(self, state, action):
-        pass
+        action = torch.flatten(action, start_dim=1).to(self.device)
+        logprob = []
+        mu, sigma = self.forward(state)
+        for i in range(len(action)):
+            dist_i = distributions.Normal(mu[i], sigma[i])
+            logprob_i = dist_i.log_prob(action[i])
+            logprob.append(logprob_i)
+        # reshape output to action shape
+        logprob = torch.stack(logprob)
+        logprob = torch.reshape(logprob, (state.shape[0],) + self.action_shape)
+        return logprob
+        
+
 
 
 #----------------------------------------------------------------------------
 # Main function test
 #----------------------------------------------------------------------------
 if __name__ == '__main__':
-    action_value_net = ActionValueNetwork(
-        lr=1e-3,
-        state_shape=(2,3),
-        action_shape=(2,2),
-        device= torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    )
-    state_value_net = StateValueNetwork(
-        lr=1e-3,
-        state_shape=(2,3),
-        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu"),
-        n_hiddens=2
-    )
-    gauss = GaussianPolicyNetwork(
+    # action_value_net = ActionValueNetwork(
+    #     lr=1e-3,
+    #     state_shape=(2,3),
+    #     action_shape=(2,2),
+    #     device= torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    # )
+    # state_value_net = StateValueNetwork(
+    #     lr=1e-3,
+    #     state_shape=(2,3),
+    #     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu"),
+    #     n_hiddens=2
+    # )
+    # gauss = GaussianPolicyNetwork(
+    #     lr=1e-3,
+    #     state_shape=(2,3),
+    #     action_shape=(2,2),
+    #     reshape_action=True,
+    #     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    # )
+    actor = TDActorNetwork(
         lr=1e-3,
         state_shape=(2,3),
         action_shape=(2,2),
@@ -187,9 +224,13 @@ if __name__ == '__main__':
     )
     state = torch.rand((5,2,3))
     action = torch.rand((5,2,2))
-    x = action_value_net.forward(state, action)
-    print(x, x.shape)
-    y = state_value_net.forward(state)
-    print(y, y.shape)
-    mu, sigma = gauss.forward(state)
-    print(mu, sigma)
+    # x = action_value_net.forward(state, action)
+    # print(x, x.shape)
+    # y = state_value_net.forward(state)
+    # print(y, y.shape)
+    # mu, sigma = gauss.forward(state)
+    # print(mu, sigma)
+    # pred_action, old_logprob = actor.act(state)
+    # print(pred_action.shape, old_logprob.shape)
+    new_logprob = actor.evaluate(state, action)
+    print(new_logprob.shape)
