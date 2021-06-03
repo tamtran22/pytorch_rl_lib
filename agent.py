@@ -4,6 +4,7 @@ from typing import TextIO
 
 from memory import RolloutBuffer
 from network import TDActorNetwork, StateValueNetwork
+from utils import DiscountCulmulativeReward
 import torch
 import gym
 import numpy as np
@@ -32,7 +33,8 @@ class BaseAgent(ABC):
 # PPO agent
 #------------------------------------------------------------------------
 class PPOAgent(BaseAgent):
-    def __init__(self, lr,  env=None, device=None) -> None:
+    def __init__(self, lr, clipping_factor, discount_factor, entropy_factor,
+            env=None, device=None) -> None:
         super().__init__()
         if device!=None:
             self.device = device
@@ -42,6 +44,9 @@ class PPOAgent(BaseAgent):
             self.get_env(env)
             self.get_memory()
             self.get_network(lr)
+        self.discount_factor = discount_factor
+        self.clipping_factor = clipping_factor
+        self.entropy_factor = entropy_factor
 
     def get_env(self, env):
         self.env = env
@@ -64,11 +69,10 @@ class PPOAgent(BaseAgent):
             'action': self.action_shape,
             'logprob': self.action_shape,
             'reward': (1,),
-            'value': (1,),
             'done': (1,)
         }
         self.memory = RolloutBuffer(
-            buffer_size=100,
+            buffer_size=10000,
             variable_dict=variable_dict
         )
     def get_network(self,lr=(None, None)):
@@ -83,8 +87,8 @@ class PPOAgent(BaseAgent):
             state_shape=self.state_shape,
             device=self.device
         )
-    def store(self, state, action, logprob, reward, value, done):
-        self.memory.store(state, action, logprob, reward, value, done)
+    def store(self, state, action, logprob, reward, done):
+        self.memory.store(state, action, logprob, reward, done)
     def generate_trajectory(self, n_steps, reset=True):
         if reset:
             state = self.env.reset()
@@ -96,26 +100,59 @@ class PPOAgent(BaseAgent):
             next_state, reward, _done, info = self.env.step(action)
             reward = np.array([reward])
             done = np.array([_done])
-            value_tensor = self.critic.forward(state_tensor)
-            value = value_tensor.cpu().detach().squeeze(0).numpy()
+
             # print(state, action, logprob, reward, value, done)
-            self.store(state, action, logprob, reward, value, done)
+            self.store(state, action, logprob, reward, done)
             if _done:
                 state = self.env.reset()
             else:
                 state = next_state
+        print(self.memory.variable['reward'].mean())
         
-    def learn_trajectory(self, batch_size):
+    def learn_trajectory(self, batch_size, n_epochs):
         batch = self.memory.sample(sample_size=batch_size)
+
         state_tensor = torch.tensor(batch['state']).float().to(self.device)
         action_tensor = torch.tensor(batch['action']).float().to(self.device)
         old_logprob_tensor = torch.tensor(batch['logprob']).float().to(self.device)
-        new_logprob_tensor = self.actor.evaluate(state_tensor, action_tensor)
-        # print(state_tensor.shape, action_tensor.shape, old_logprob_tensor.shape, new_logprob_tensor.shape)
-        print(batch['done'])
-        # for i in range(batch_size):
+        return_tensor = torch.tensor(
+            DiscountCulmulativeReward(batch['reward'], batch['done'], self.discount_factor)
+        ).float().to(self.device)
 
+        for _ in range(n_epochs):
+            new_logprob_tensor, entropy_tensor = self.actor.evaluate(state_tensor, action_tensor)
+            value_tensor = self.critic.forward(state_tensor)
+            advantage_tensor = return_tensor - value_tensor
+            ratio = torch.exp(new_logprob_tensor - old_logprob_tensor)
+            surr1 = ratio * advantage_tensor
+            surr2 = torch.clamp(ratio, 1.-self.clipping_factor, \
+                1+self.clipping_factor) * advantage_tensor
+            
+            actor_loss = torch.min(surr1, surr2)
+            critic_loss = 0.5 * torch.square(value_tensor-return_tensor)
+            entropy_loss = -self.entropy_factor * entropy_tensor
+            loss = torch.mean(actor_loss + critic_loss + entropy_loss)
+            # print(actor_loss.mean().item(), critic_loss.mean().item(), entropy_loss.mean().item())
+            # print(loss.item())
 
+            self.actor.optimizer.zero_grad()
+            self.critic.optimizer.zero_grad()
+            loss.backward()
+            self.actor.optimizer.step()
+            self.critic.optimizer.step()
+        
+        # self.save_model()
+            
+
+            
+
+    def save_model(self):
+        print("Saving networks...")
+        self.actor.save()
+        self.critic.save()
+    def load_model(self):
+        self.actor.load()
+        self.critic.load()
 
 
 
@@ -128,14 +165,19 @@ if __name__ == '__main__':
     env = gym.make("MountainCarContinuous-v0")
     agent = PPOAgent(
         lr=(1e-3, 1e-3),
+        clipping_factor=0.9,
+        discount_factor=0.99,
+        entropy_factor=0.1,
         env=env,
         device=torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     )
-    agent.generate_trajectory(
-        n_steps=10,
-        reset=True
-    )
-    agent.learn_trajectory(4)
+    for i in range(1000):
+        # print("Iteration ", i)
+        agent.generate_trajectory(
+            n_steps=100,
+            reset=True
+        )
+        agent.learn_trajectory(100, 10)
     # print(agent.memory.variable)
     # print(agent.state_shape)
     # print(agent.action_shape)

@@ -181,15 +181,19 @@ class TDActorNetwork(GaussianPolicyNetwork):
     def evaluate(self, state, action):
         action = torch.flatten(action, start_dim=1).to(self.device)
         logprob = []
+        entropy = []
         mu, sigma = self.forward(state)
         for i in range(len(action)):
             dist_i = distributions.Normal(mu[i], sigma[i])
             logprob_i = dist_i.log_prob(action[i])
             logprob.append(logprob_i)
+            entropy.append(dist_i.entropy())
         # reshape output to action shape
         logprob = torch.stack(logprob)
         logprob = torch.reshape(logprob, (state.shape[0],) + self.action_shape)
-        return logprob
+        entropy = torch.stack(entropy)
+        entropy = torch.reshape(entropy, (state.shape[0],) + self.action_shape)
+        return logprob, entropy
         
 
 
@@ -223,15 +227,15 @@ if __name__ == '__main__':
         action_shape=(2,),
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     )
-    state = torch.rand((1,4))
-    action = torch.rand((1,2))
+    state = torch.rand((4,4))
+    action = torch.rand((4,2))
     # x = action_value_net.forward(state, action)
     # print(x, x.shape)
     # y = state_value_net.forward(state)
     # print(y, y.shape)
     # mu, sigma = gauss.forward(state)
     # print(mu, sigma)
-    pred_action, old_logprob = actor.act(state)
-    print(pred_action.shape, old_logprob.shape)
-    # new_logprob = actor.evaluate(state, action)
-    # print(new_logprob.shape)
+    # pred_action, old_logprob = actor.act(state)
+    # print(pred_action.shape, old_logprob.shape)
+    new_logprob, entropy = actor.evaluate(state, action)
+    print(new_logprob.shape, entropy.shape)
