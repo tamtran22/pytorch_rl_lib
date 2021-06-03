@@ -2,7 +2,6 @@ from abc import ABC
 from math import e
 from typing import TextIO
 
-from torch._C import LoggerBase
 from memory import RolloutBuffer
 from network import TDActorNetwork, StateValueNetwork
 import torch
@@ -15,15 +14,8 @@ import numpy as np
 # base agent class
 #------------------------------------------------------------------------
 class BaseAgent(ABC):
-    def __init__(self, device) -> None:
+    def __init__(self) -> None:
         super().__init__()
-        self.device = device
-    def get_env(self):
-        pass
-    def get_memory(self):
-        pass
-    def get_network(self):
-        pass
     def record(self):
         pass
     def save_model(self):
@@ -41,24 +33,29 @@ class BaseAgent(ABC):
 #------------------------------------------------------------------------
 class PPOAgent(BaseAgent):
     def __init__(self, lr,  env=None, device=None) -> None:
-        super().__init__(device)
+        super().__init__()
+        if device!=None:
+            self.device = device
+        else:
+            self.device = torch.device(torch.device("cuda:0" if torch.cuda.is_available() else "cpu"))
         if env != None:
             self.get_env(env)
             self.get_memory()
             self.get_network(lr)
-
 
     def get_env(self, env):
         self.env = env
         # check discrete and continious space
         if self.env.observation_space.shape == ():
             # discrete space
-            self.state_shape = (self.env.observation_space.n,)
+            # self.state_shape = (self.env.observation_space.n,)
+            self.state_shape = (1,)
         else:
             # continuous space
             self.state_shape = self.env.observation_space.shape
         if env.action_space.shape == ():
-            self.action_shape = (self.env.action_space.n,)
+            # self.action_shape = (self.env.action_space.n,)
+            self.action_shape = (1,)
         else:
             self.action_shape = self.env.action_space.shape
     def get_memory(self):
@@ -67,7 +64,7 @@ class PPOAgent(BaseAgent):
             'action': self.action_shape,
             'logprob': self.action_shape,
             'reward': (1,),
-            'state_value': (1,),
+            'value': (1,),
             'done': (1,)
         }
         self.memory = RolloutBuffer(
@@ -86,26 +83,39 @@ class PPOAgent(BaseAgent):
             state_shape=self.state_shape,
             device=self.device
         )
-    def store(self, state, action, logprob, reward, state_value, done):
-        self.memory.store([state, action, logprob, reward, state_value, done])
+    def store(self, state, action, logprob, reward, value, done):
+        self.memory.store(state, action, logprob, reward, value, done)
     def generate_trajectory(self, n_steps, reset=True):
         if reset:
             state = self.env.reset()
         for _ in range(n_steps):
-            action, logprob = self.actor.act(torch.tensor(state).unsqueeze(0).to(self.device))
-            action = action.squeeze(0).numpy()
-            logprob = logprob.squeeze(0).numpy()
+            state_tensor = torch.tensor(state).unsqueeze(0).float().to(self.device)
+            action_tensor, logprob_tensor = self.actor.act(state_tensor)
+            action = action_tensor.cpu().detach().squeeze(0).numpy()
+            logprob = logprob_tensor.cpu().detach().squeeze(0).numpy()
             next_state, reward, _done, info = self.env.step(action)
             reward = np.array([reward])
             done = np.array([_done])
-            state_value = self.critic.forward(torch.tensor(state).unsqueeze(0).to(self.device))
-            state_value = state_value.squeeze(0).numpy()
-            self.store(state, action, logprob, reward, state_value, done)
+            value_tensor = self.critic.forward(state_tensor)
+            value = value_tensor.cpu().detach().squeeze(0).numpy()
+            # print(state, action, logprob, reward, value, done)
+            self.store(state, action, logprob, reward, value, done)
             if _done:
                 state = self.env.reset()
+            else:
+                state = next_state
         
     def learn_trajectory(self, batch_size):
         batch = self.memory.sample(sample_size=batch_size)
+        state_tensor = torch.tensor(batch['state']).float().to(self.device)
+        action_tensor = torch.tensor(batch['action']).float().to(self.device)
+        old_logprob_tensor = torch.tensor(batch['logprob']).float().to(self.device)
+        new_logprob_tensor = self.actor.evaluate(state_tensor, action_tensor)
+        # print(state_tensor.shape, action_tensor.shape, old_logprob_tensor.shape, new_logprob_tensor.shape)
+        print(batch['done'])
+        # for i in range(batch_size):
+
+
 
 
 
@@ -115,13 +125,17 @@ class PPOAgent(BaseAgent):
 # main function
 #-------------------------------------------------------------------------
 if __name__ == '__main__':
-    env = gym.make("CartPole-v1")
+    env = gym.make("MountainCarContinuous-v0")
     agent = PPOAgent(
         lr=(1e-3, 1e-3),
         env=env,
         device=torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     )
-    print(type(env.reset()))
+    agent.generate_trajectory(
+        n_steps=10,
+        reset=True
+    )
+    agent.learn_trajectory(4)
     # print(agent.memory.variable)
     # print(agent.state_shape)
     # print(agent.action_shape)

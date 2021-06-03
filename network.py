@@ -159,6 +159,7 @@ class GaussianPolicyNetwork(BaseNetwork):
 
 
 
+
 class TDActorNetwork(GaussianPolicyNetwork):
     def __init__(self, lr, state_shape, action_shape, device, n_hiddens=2, 
             hidden_size=256, name='actor_TD', chkpt='./temp') -> None:
@@ -218,19 +219,19 @@ if __name__ == '__main__':
     # )
     actor = TDActorNetwork(
         lr=1e-3,
-        state_shape=(2,3),
-        action_shape=(2,2),
+        state_shape=(4,),
+        action_shape=(2,),
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     )
-    state = torch.rand((5,2,3))
-    action = torch.rand((5,2,2))
+    state = torch.rand((1,4))
+    action = torch.rand((1,2))
     # x = action_value_net.forward(state, action)
     # print(x, x.shape)
     # y = state_value_net.forward(state)
     # print(y, y.shape)
     # mu, sigma = gauss.forward(state)
     # print(mu, sigma)
-    # pred_action, old_logprob = actor.act(state)
-    # print(pred_action.shape, old_logprob.shape)
-    new_logprob = actor.evaluate(state, action)
-    print(new_logprob.shape)
+    pred_action, old_logprob = actor.act(state)
+    print(pred_action.shape, old_logprob.shape)
+    # new_logprob = actor.evaluate(state, action)
+    # print(new_logprob.shape)

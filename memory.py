@@ -38,8 +38,10 @@ class RolloutBuffer(BaseMemory):
 
     def store(self, *args):
         if len(args) != len(self.variable):
-            print('Memory error: The number of variables to be stored is different' +
-                ' from number of variables in memory type.')
+            a = len(args)
+            b = len(self.variable)
+            print(f'Memory error: The number of variables ({a}) to be stored is different' +
+                f' from number of variables in memory type ({b}).')
         else:
             var_i = 0
             added = True
