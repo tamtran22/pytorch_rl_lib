@@ -128,16 +128,19 @@ class PPOAgent(BaseAgent):
             surr2 = torch.clamp(ratio, 1.-self.clipping_factor, \
                 1+self.clipping_factor) * advantage_tensor
             
-            actor_loss = torch.min(surr1, surr2)
-            critic_loss = 0.5 * torch.square(value_tensor-return_tensor)
-            entropy_loss = -self.entropy_factor * entropy_tensor
-            loss = torch.mean(actor_loss + critic_loss + entropy_loss)
+            actor_loss = -torch.min(surr1, surr2).mean()
+            critic_loss = 0.5 * torch.square(value_tensor-return_tensor).mean()
+            entropy_loss = -self.entropy_factor * entropy_tensor.mean()
+            # loss = torch.mean(actor_loss + critic_loss + entropy_loss)
             # print(actor_loss.mean().item(), critic_loss.mean().item(), entropy_loss.mean().item())
             # print(loss.item())
 
             self.actor.optimizer.zero_grad()
             self.critic.optimizer.zero_grad()
-            loss.backward()
+            # loss.backward()
+            actor_loss.backward(retain_graph=True)
+            critic_loss.backward(retain_graph=True)
+            entropy_loss.backward()
             self.actor.optimizer.step()
             self.critic.optimizer.step()
         
@@ -177,7 +180,7 @@ if __name__ == '__main__':
             n_steps=100,
             reset=True
         )
-        agent.learn_trajectory(100, 10)
+        agent.learn_trajectory(100, 50)
     # print(agent.memory.variable)
     # print(agent.state_shape)
     # print(agent.action_shape)
