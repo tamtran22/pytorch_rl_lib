@@ -4,7 +4,7 @@ from typing import TextIO
 
 from memory import RolloutBuffer
 from network import TDActorNetwork, StateValueNetwork
-from utils import DiscountCulmulativeReward
+from utils import cal_discount_culmulative_reward
 import torch
 import gym
 import numpy as np
@@ -15,8 +15,33 @@ import numpy as np
 # base agent class
 #------------------------------------------------------------------------
 class BaseAgent(ABC):
-    def __init__(self) -> None:
+    def __init__(self, lr,  env=None, device=None) -> None:
         super().__init__()
+        if device!=None:
+            self.device = device
+        else:
+            self.device = torch.device(torch.device("cuda:0" if torch.cuda.is_available() else "cpu"))
+        if env != None:
+            self.get_env(env)
+            self.get_memory()
+            self.get_network(lr)
+    def get_env(self, env):
+        self.env = env
+        # check discrete and continious space
+        if self.env.observation_space.shape == ():
+            # discrete space
+            self.state_shape = (1,)
+        else:
+            # continuous space
+            self.state_shape = self.env.observation_space.shape
+        if env.action_space.shape == ():
+            self.action_shape = (1,)
+        else:
+            self.action_shape = self.env.action_space.shape
+    def get_memory(self):
+        pass
+    def get_network(self, lr):
+        pass
     def record(self):
         pass
     def save_model(self):
@@ -35,34 +60,12 @@ class BaseAgent(ABC):
 class PPOAgent(BaseAgent):
     def __init__(self, lr, clipping_factor, discount_factor, entropy_factor,
             env=None, device=None) -> None:
-        super().__init__()
-        if device!=None:
-            self.device = device
-        else:
-            self.device = torch.device(torch.device("cuda:0" if torch.cuda.is_available() else "cpu"))
-        if env != None:
-            self.get_env(env)
-            self.get_memory()
-            self.get_network(lr)
+        super().__init__(lr, env, device)
+
         self.discount_factor = discount_factor
         self.clipping_factor = clipping_factor
         self.entropy_factor = entropy_factor
 
-    def get_env(self, env):
-        self.env = env
-        # check discrete and continious space
-        if self.env.observation_space.shape == ():
-            # discrete space
-            # self.state_shape = (self.env.observation_space.n,)
-            self.state_shape = (1,)
-        else:
-            # continuous space
-            self.state_shape = self.env.observation_space.shape
-        if env.action_space.shape == ():
-            # self.action_shape = (self.env.action_space.n,)
-            self.action_shape = (1,)
-        else:
-            self.action_shape = self.env.action_space.shape
     def get_memory(self):
         variable_dict = {
             'state': self.state_shape,
@@ -116,7 +119,7 @@ class PPOAgent(BaseAgent):
         action_tensor = torch.tensor(batch['action']).float().to(self.device)
         old_logprob_tensor = torch.tensor(batch['logprob']).float().to(self.device)
         return_tensor = torch.tensor(
-            DiscountCulmulativeReward(batch['reward'], batch['done'], self.discount_factor)
+            cal_discount_culmulative_reward(batch['reward'], batch['done'], self.discount_factor)
         ).float().to(self.device)
 
         for _ in range(n_epochs):
@@ -159,6 +162,15 @@ class PPOAgent(BaseAgent):
 
 
 
+#-------------------------------------------------------------------------
+# policy grad agent
+#-------------------------------------------------------------------------
+class PolicyGradient(BaseAgent):
+    def __init__(self, lr, env=None, device=None) -> None:
+        super().__init__(lr, env, device)
+    
+    def get_network(self, lr):
+        return super().get_network(lr)
 
 
 #-------------------------------------------------------------------------

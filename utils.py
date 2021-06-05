@@ -1,6 +1,6 @@
 import numpy as np
 
-def DiscountCulmulativeReward(reward, done, gamma):
+def cal_discount_culmulative_reward(reward, done, gamma):
     culmulative_reward = np.zeros(reward.shape)
     count = 0
     discount_reward = 0
