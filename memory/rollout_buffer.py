@@ -1,23 +1,5 @@
+from memory.base_memory import BaseMemory
 import numpy as np
-from abc import ABC
-
-
-
-
-#-------------------------------------------------------------------#
-# Abstract base class
-#-------------------------------------------------------------------#
-class BaseMemory(ABC):
-    def __init__(self, buffer_size) -> None:
-        super().__init__()
-        self.buffer_size = buffer_size
-    def store(self, *args, **kwargs):
-        pass
-    def sample(self, *args, **kwargs):
-        pass
-    def clear(self, *args, **kwargs):
-        pass
-
 
 
 
@@ -34,7 +16,7 @@ class RolloutBuffer(BaseMemory):
         self.__count = 0
         for var in variable_dict:
             self.variable[var] = np.zeros((self.buffer_size,) + \
-                variable_dict[var], dtype=np.float)
+                variable_dict[var], dtype=float)
 
     def store(self, *args):
         if len(args) != len(self.variable):
