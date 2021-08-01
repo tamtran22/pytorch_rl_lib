@@ -9,14 +9,22 @@ import numpy as np
 # Main memory class
 #-------------------------------------------------------------------#
 class RolloutBuffer(BaseMemory):
-    def __init__(self, buffer_size, variable_dict) -> None:
+    def __init__(self, 
+        buffer_size=10000, 
+        variable_dict={'state':(1,)}
+    ) -> None:
         super().__init__(buffer_size)
         self.variable = {}
         self.current_id = 0
         self.__count = 0
+        if (len(variable_dict)==1):
+            print(f'Create memory container with {len(variable_dict)} variable.')
+        else:
+            print(f'Create memory container with {len(variable_dict)} variables.')
         for var in variable_dict:
             self.variable[var] = np.zeros((self.buffer_size,) + \
                 variable_dict[var], dtype=float)
+            print(f'...Add \'{var}\' with shape {variable_dict[var]}...')
 
     def store(self, *args):
         if len(args) != len(self.variable):

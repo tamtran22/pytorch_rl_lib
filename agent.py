@@ -4,7 +4,7 @@ from typing import TextIO
 
 from memory.rollout_buffer import RolloutBuffer
 from network.network import TDActorNetwork, StateValueNetwork
-from utils.utils import DiscountCulmulativeReward
+from utils.utils import cal_discount_culmulative_reward
 import torch
 import gym
 import numpy as np
@@ -116,7 +116,7 @@ class PPOAgent(BaseAgent):
         action_tensor = torch.tensor(batch['action']).float().to(self.device)
         old_logprob_tensor = torch.tensor(batch['logprob']).float().to(self.device)
         return_tensor = torch.tensor(
-            DiscountCulmulativeReward(batch['reward'], batch['done'], self.discount_factor)
+            cal_discount_culmulative_reward(batch['reward'], batch['done'], self.discount_factor)
         ).float().to(self.device)
 
         for _ in range(n_epochs):
@@ -131,16 +131,14 @@ class PPOAgent(BaseAgent):
             actor_loss = -torch.min(surr1, surr2).mean()
             critic_loss = 0.5 * torch.square(value_tensor-return_tensor).mean()
             entropy_loss = -self.entropy_factor * entropy_tensor.mean()
-            # loss = torch.mean(actor_loss + critic_loss + entropy_loss)
-            # print(actor_loss.mean().item(), critic_loss.mean().item(), entropy_loss.mean().item())
-            # print(loss.item())
+            loss = actor_loss + critic_loss
 
             self.actor.optimizer.zero_grad()
             self.critic.optimizer.zero_grad()
-            # loss.backward()
-            actor_loss.backward(retain_graph=True)
-            critic_loss.backward(retain_graph=True)
-            entropy_loss.backward()
+            loss.backward()
+            # actor_loss.backward(retain_graph=True)
+            # critic_loss.backward(retain_graph=True)
+            # entropy_loss.backward()
             self.actor.optimizer.step()
             self.critic.optimizer.step()
         
