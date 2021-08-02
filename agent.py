@@ -2,9 +2,15 @@ from abc import ABC
 from math import e
 from typing import TextIO
 
+<<<<<<< HEAD
 from memory import RolloutBuffer
 from network import TDActorNetwork, StateValueNetwork
 from utils import cal_discount_culmulative_reward
+=======
+from memory.rollout_buffer import RolloutBuffer
+from network.network import TDActorNetwork, StateValueNetwork
+from utils.utils import cal_discount_culmulative_reward
+>>>>>>> 759116c068149adb24c65fcf877c5db5db0234f8
 import torch
 import gym
 import numpy as np
@@ -134,16 +140,14 @@ class PPOAgent(BaseAgent):
             actor_loss = -torch.min(surr1, surr2).mean()
             critic_loss = 0.5 * torch.square(value_tensor-return_tensor).mean()
             entropy_loss = -self.entropy_factor * entropy_tensor.mean()
-            # loss = torch.mean(actor_loss + critic_loss + entropy_loss)
-            # print(actor_loss.mean().item(), critic_loss.mean().item(), entropy_loss.mean().item())
-            # print(loss.item())
+            loss = actor_loss + critic_loss
 
             self.actor.optimizer.zero_grad()
             self.critic.optimizer.zero_grad()
-            # loss.backward()
-            actor_loss.backward(retain_graph=True)
-            critic_loss.backward(retain_graph=True)
-            entropy_loss.backward()
+            loss.backward()
+            # actor_loss.backward(retain_graph=True)
+            # critic_loss.backward(retain_graph=True)
+            # entropy_loss.backward()
             self.actor.optimizer.step()
             self.critic.optimizer.step()
         
