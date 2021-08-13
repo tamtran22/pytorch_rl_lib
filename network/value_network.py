@@ -9,14 +9,6 @@ from utils.utils import prod
 #----------------------------------------------------------------------------
 # network
 #----------------------------------------------------------------------------
-def prod(_tuple):
-    product = 1
-    for element in list(_tuple):
-        product *= element
-    return int(product)
-
-
-
 
 class ActionValueNetwork(BaseNetwork):
     def __init__(self, lr, state_shape, action_shape, device, n_hiddens=2,

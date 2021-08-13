@@ -2,15 +2,9 @@ from abc import ABC
 from math import e
 from typing import TextIO
 
-<<<<<<< HEAD
 from memory import RolloutBuffer
 from network import TDActorNetwork, StateValueNetwork
 from utils import cal_discount_culmulative_reward
-=======
-from memory.rollout_buffer import RolloutBuffer
-from network.network import TDActorNetwork, StateValueNetwork
-from utils.utils import cal_discount_culmulative_reward
->>>>>>> 759116c068149adb24c65fcf877c5db5db0234f8
 import torch
 import gym
 import numpy as np
