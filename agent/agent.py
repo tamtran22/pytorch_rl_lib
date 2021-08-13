@@ -1,7 +1,3 @@
-from abc import ABC
-from math import e
-from typing import TextIO
-
 from memory import RolloutBuffer
 from network import TDActorNetwork, StateValueNetwork
 from utils import cal_discount_culmulative_reward
@@ -14,7 +10,7 @@ import numpy as np
 #------------------------------------------------------------------------
 # base agent class
 #------------------------------------------------------------------------
-class BaseAgent(ABC):
+class BaseAgent():
     def __init__(self, lr,  env=None, device=None) -> None:
         super().__init__()
         if device!=None:
