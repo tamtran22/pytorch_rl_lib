@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from torch.nn.modules.activation import ReLU
 import torch.optim as optim
 from network.base_network import BaseNetwork
 from utils.utils import prod
@@ -19,7 +20,7 @@ class CategoricalDistributionNetwork(BaseNetwork):
 
         # Flatten input tensor
         self.create_input_layer(self.input_shape, hidden_size)
-        self.create_hidden_layers(n_hiddens, hidden_size)
+        self.create_hidden_layer(n_hiddens, hidden_size)
         self.create_output_layer(hidden_size, self.output_shape)
 
         self.optimizer = optim.Adam(
@@ -40,7 +41,7 @@ class CategoricalDistributionNetwork(BaseNetwork):
 
 class GaussianDistributionNetwork(BaseNetwork):
     def __init__(self, lr, input_shape, output_shape, device, n_hiddens=2,
-            hidden_size=256, reshape_output=False, name='actor_gauss',
+            hidden_size=256, reshape_output=True, name='actor_gauss',
             chkpt='./tmp') -> None:
         super().__init__(device, name, chkpt)
         self.input_shape = input_shape
@@ -49,12 +50,12 @@ class GaussianDistributionNetwork(BaseNetwork):
 
         # Flaten input tensor
         self.create_input_layer(self.input_shape, hidden_size)
-        self.create_hidden_layers(n_hiddens, hidden_size)
+        self.create_hidden_layer(n_hiddens, hidden_size)
         self.sigma = nn.Sequential(
-            nn.Linear(hidden_size, prod(self.action_shape))
-            # nn.Sigmoid()
+            nn.Linear(hidden_size, prod(self.output_shape)),
+            nn.ReLU()
         )
-        self.mu = nn.Linear(hidden_size, prod(self.action_shape))
+        self.mu = nn.Linear(hidden_size, prod(self.output_shape))
 
         self.optimizer = optim.Adam(
             self.parameters(), 
