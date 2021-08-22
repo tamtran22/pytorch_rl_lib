@@ -16,13 +16,17 @@ class BaseAgent():
         # Discrete/continuous state space
         if self.env.observation_space.shape == ():
             self.state_shape = (self.env.observation_space.n,)
+            self.state_type = 'discrete'
         else:
             self.state_shape = self.env.observation_space.shape
+            self.state_type = 'continuous'
         # Discrete/continuous action space
         if env.action_space.shape == ():
             self.action_shape = (self.env.action_space.n,)
+            self.action_type = 'discrete'
         else:
             self.action_shape = self.env.env.action_space.shape
+            self.action_type = 'continuous'
     
     def create_memory(self, *args, **kwargs):
         self.memory = None

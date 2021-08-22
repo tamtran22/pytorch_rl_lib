@@ -22,15 +22,16 @@ class PPOAgent(BaseAgent):
     
     def create_network(self):
         super().create_network()
-        self.network['actor'] = DiscreteTDActor(
-            lr=1e-4,
-            state_shape=self.state_shape,
-            n_actions=self.action_shape[0],
-            device=self.device,
-            n_hiddens=2,
-            hidden_size=128,
-            name='actor'
-        )
+        if self.action_type == 'discrete':
+            self.network['actor'] = DiscreteTDActor(
+                lr=1e-4,
+                state_shape=self.state_shape,
+                n_actions=self.action_shape[0],
+                device=self.device,
+                n_hiddens=2,
+                hidden_size=128,
+                name='actor'
+            )
         self.network['critic'] = StateValueNetwork(
             lr=1e-4,
             state_shape=self.state_shape,
