@@ -41,6 +41,9 @@ class DiscreteTDActor(CategoricalDistributionNetwork):
         logprob = torch.stack(logprob)
         entropy = torch.stack(entropy)
         return logprob, entropy
+    def fixed_policy(self, epsilon):
+        pass
+
 
 
 class ContinuousTDActor(GaussianDistributionNetwork):

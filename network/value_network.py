@@ -19,9 +19,9 @@ class ActionValueNetwork(BaseNetwork):
 
 
         # Input layer take flatened transform of input tensor
-        self.create_input_layer(self.input_shape, hidden_size, nn.SiLU())
-        self.create_hidden_layer(n_hiddens, hidden_size, nn.SiLU())
-        self.create_output_layer(hidden_size, self.output_shape, nn.SiLU())
+        self.create_input_layer(self.input_shape, hidden_size, nn.ReLU())
+        self.create_hidden_layer(n_hiddens, hidden_size, nn.ReLU())
+        self.create_output_layer(hidden_size, self.output_shape, nn.ReLU())
 
         self.optimizer = optim.Adam(
             self.parameters(), 

@@ -15,3 +15,5 @@ if __name__=='__main__':
     print(ppo.state_shape, ppo.action_shape)
     for net in ppo.network:
         print(ppo.network[net])
+    ppo.generate_trajectory(10)
+    print(ppo.memory.variable)
