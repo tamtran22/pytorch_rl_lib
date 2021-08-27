@@ -48,9 +48,9 @@ class DiscreteTDActor(CategoricalDistributionNetwork):
 
 class ContinuousTDActor(GaussianDistributionNetwork):
     def __init__(self, lr, state_shape, action_shape, device, n_hiddens=2, 
-            hidden_size=256, name='actor_TD', chkpt='./temp') -> None:
+            hidden_size=256, reshape_output=True, name='actor_TD', chkpt='./temp') -> None:
         super().__init__(lr, state_shape, action_shape, device, 
-            n_hiddens=n_hiddens, hidden_size=hidden_size, reshape_output=True,
+            n_hiddens=n_hiddens, hidden_size=hidden_size, reshape_output=reshape_output,
             name=name, chkpt=chkpt)
     def act(self, state):
         # Feeding 1 state at a time.
@@ -60,10 +60,6 @@ class ContinuousTDActor(GaussianDistributionNetwork):
         dist = distributions.Normal(mu, sigma)
         pred_action = dist.sample()
         logprob = dist.log_prob(pred_action)
-        # reshape output to action shape
-        if self.reshape_output:
-            pred_action = torch.reshape(pred_action, (state.shape[0],) + self.output_shape)
-            logprob = torch.reshape(logprob, (state.shape[0],) + self.output_shape)
         return pred_action, logprob
     def evaluate(self, state, action):
         action = torch.flatten(action, start_dim=1).to(self.device)
@@ -75,12 +71,8 @@ class ContinuousTDActor(GaussianDistributionNetwork):
             logprob_i = dist_i.log_prob(action[i])
             logprob.append(logprob_i)
             entropy.append(dist_i.entropy())
-        # reshape output to action shape
         logprob = torch.stack(logprob)
         entropy = torch.stack(entropy)
-        if self.reshape_output:
-            logprob = torch.reshape(logprob, (state.shape[0],) + self.output_shape)
-            entropy = torch.reshape(entropy, (state.shape[0],) + self.output_shape)
         return logprob, entropy
 
 if __name__=='__main__':

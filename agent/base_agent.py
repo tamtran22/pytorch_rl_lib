@@ -32,15 +32,15 @@ class BaseAgent():
         self.memory = None
     
     def create_network(self, *args, **kwargs):
-        self.network = {}
+        self.network = []
     
     def save_network(self):
         print("Saving networks...")
         for net in self.network:
-            self.network[net].save()
+            net.save()
     
     def load_network(self):
         print("Saving network...")
         for net in self.network:
-            self.network[net].load()
+            net.load()
     

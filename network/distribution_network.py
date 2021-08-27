@@ -53,7 +53,7 @@ class GaussianDistributionNetwork(BaseNetwork):
         self.create_hidden_layer(n_hiddens, hidden_size)
         self.sigma = nn.Sequential(
             nn.Linear(hidden_size, prod(self.output_shape)),
-            nn.ReLU()
+            nn.Sigmoid()
         )
         self.mu = nn.Linear(hidden_size, prod(self.output_shape))
 
@@ -70,6 +70,7 @@ class GaussianDistributionNetwork(BaseNetwork):
         mu = self.mu(x)
         # reshape output as the same shape as action require.
         if self.reshape_output:
+            # print('reshape output to ', (state.shape[0],) + self.output_shape, ' on ', self.name)
             mu = torch.reshape(mu, (state.shape[0],) + self.output_shape)
             sigma = torch.reshape(sigma, (state.shape[0],) + self.output_shape)
         return mu, sigma
